@@ -83,9 +83,6 @@ class Picacomic : HttpSource(), ConfigurableSource {
         t
     }
 
-    @Serializable
-    data class payload(val exp: Int, val iat: String)
-
     fun isExpired(token: String, leeway: Long): Boolean {
         require(leeway >= 0) { "The leeway must be a positive value." }
 

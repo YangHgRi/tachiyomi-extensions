@@ -5,7 +5,6 @@ import android.content.SharedPreferences
 import androidx.preference.EditTextPreference
 import androidx.preference.ListPreference
 import androidx.preference.PreferenceScreen
-import com.auth0.android.jwt.JWT
 import eu.kanade.tachiyomi.network.GET
 import eu.kanade.tachiyomi.network.POST
 import eu.kanade.tachiyomi.source.ConfigurableSource
@@ -16,6 +15,7 @@ import eu.kanade.tachiyomi.source.model.Page
 import eu.kanade.tachiyomi.source.model.SChapter
 import eu.kanade.tachiyomi.source.model.SManga
 import eu.kanade.tachiyomi.source.online.HttpSource
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -26,10 +26,13 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
+import org.json.JSONObject
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
 import java.net.URLEncoder
 import java.text.SimpleDateFormat
+import java.util.Base64
+import java.util.Date
 import java.util.Locale
 
 class Picacomic : HttpSource(), ConfigurableSource {
@@ -67,7 +70,7 @@ class Picacomic : HttpSource(), ConfigurableSource {
 
     private val token: String by lazy {
         var t: String = preferences.getString("TOKEN", "")!!
-        if (t.isEmpty() || JWT(t).isExpired(10)) {
+        if (t.isEmpty() || isExpired(t, 10)) {
             val username = preferences.getString("USERNAME", "")!!
             val password = preferences.getString("PASSWORD", "")!!
             if (username.isEmpty() || password.isEmpty()) {
@@ -78,6 +81,45 @@ class Picacomic : HttpSource(), ConfigurableSource {
             preferences.edit().putString("TOKEN", t).apply()
         }
         t
+    }
+
+    @Serializable
+    data class payload(val exp: Int, val iat: String)
+
+    fun isExpired(token: String, leeway: Long): Boolean {
+        require(leeway >= 0) { "The leeway must be a positive value." }
+
+        var parts: Array<String?> =
+            token.split("\\.".toRegex()).dropLastWhile { it.isEmpty() }.toTypedArray()
+
+        if (parts.size == 2 && token.endsWith(".")) {
+            parts = arrayOf(parts[0], parts[1], "")
+        }
+        if (parts.size != 3) {
+            throw Exception(
+                String.format(
+                    "token shoud have 3 parts, but now there's %s.",
+                    parts.size,
+                ),
+            )
+        }
+
+        val payload = parts[1]?.let { JSONObject(String(Base64.getDecoder().decode(it))) }
+
+        val exp = payload?.getLong("exp")?.let {
+            Date(it * 1000)
+        }
+        val iat = payload?.getLong("iat")?.let {
+            Date(it * 1000)
+        }
+
+        val todayTime =
+            (Math.floor((Date().time / 1000).toDouble()) * 1000).toLong() // truncate millis
+        val futureToday = Date(todayTime + leeway * 1000)
+        val pastToday = Date(todayTime - leeway * 1000)
+        val expValid = exp == null || !pastToday.after(exp)
+        val iatValid = iat == null || !futureToday.before(iat)
+        return !expValid || !iatValid
     }
 
     private fun picaHeaders(url: String, method: String = "GET"): Headers {

@@ -13,5 +13,3 @@ ext {
 dependencies {
     implementation 'com.auth0.android:jwtdecode:2.0.0'
 }
-
-apply from: "$rootDir/common.gradle"

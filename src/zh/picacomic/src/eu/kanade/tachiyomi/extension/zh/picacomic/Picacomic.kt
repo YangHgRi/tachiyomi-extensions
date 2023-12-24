@@ -2,6 +2,8 @@ package eu.kanade.tachiyomi.extension.zh.picacomic
 
 import android.app.Application
 import android.content.SharedPreferences
+import android.os.Build
+import androidx.annotation.RequiresApi
 import androidx.preference.EditTextPreference
 import androidx.preference.ListPreference
 import androidx.preference.PreferenceScreen
@@ -15,7 +17,6 @@ import eu.kanade.tachiyomi.source.model.Page
 import eu.kanade.tachiyomi.source.model.SChapter
 import eu.kanade.tachiyomi.source.model.SManga
 import eu.kanade.tachiyomi.source.online.HttpSource
-import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -34,7 +35,9 @@ import java.text.SimpleDateFormat
 import java.util.Base64
 import java.util.Date
 import java.util.Locale
+import kotlin.math.floor
 
+@RequiresApi(Build.VERSION_CODES.O)
 class Picacomic : HttpSource(), ConfigurableSource {
     override val lang = "zh"
     override val supportsLatest = true
@@ -83,6 +86,7 @@ class Picacomic : HttpSource(), ConfigurableSource {
         t
     }
 
+    @RequiresApi(Build.VERSION_CODES.O)
     fun isExpired(token: String, leeway: Long): Boolean {
         require(leeway >= 0) { "The leeway must be a positive value." }
 
@@ -111,7 +115,7 @@ class Picacomic : HttpSource(), ConfigurableSource {
         }
 
         val todayTime =
-            (Math.floor((Date().time / 1000).toDouble()) * 1000).toLong() // truncate millis
+            (floor((Date().time / 1000).toDouble()) * 1000).toLong() // truncate millis
         val futureToday = Date(todayTime + leeway * 1000)
         val pastToday = Date(todayTime - leeway * 1000)
         val expValid = exp == null || !pastToday.after(exp)
@@ -232,7 +236,7 @@ class Picacomic : HttpSource(), ConfigurableSource {
     }
 
     private fun hitBlocklist(comic: PicaSearchComic): Boolean {
-        return (comic.tags ?: emptyList<String>() + comic.categories)
+        return ((comic.tags ?: (emptyList<String>() + comic.categories)))
             .map(String::trim)
             .any { it in blocklist }
     }
@@ -274,7 +278,7 @@ class Picacomic : HttpSource(), ConfigurableSource {
             author = comic.author
             description = comic.description
             artist = comic.artist
-            genre = (comic.tags ?: emptyList<String>() + comic.categories)
+            genre = ((comic.tags ?: (emptyList<String>() + comic.categories)))
                 .map(String::trim)
                 .distinct()
                 .joinToString(", ")

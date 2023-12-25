@@ -1,5 +1,6 @@
 package eu.kanade.tachiyomi.extension.zh.picacomic
 
+import android.annotation.SuppressLint
 import android.app.Application
 import android.content.SharedPreferences
 import android.os.Build
@@ -37,7 +38,7 @@ import java.util.Date
 import java.util.Locale
 import kotlin.math.floor
 
-@RequiresApi(Build.VERSION_CODES.O)
+@SuppressLint("NewApi")
 class Picacomic : HttpSource(), ConfigurableSource {
     override val lang = "zh"
     override val supportsLatest = true

@@ -1,10 +1,8 @@
 package eu.kanade.tachiyomi.extension.zh.picacomic
 
-import android.annotation.SuppressLint
 import android.app.Application
 import android.content.SharedPreferences
-import android.os.Build
-import androidx.annotation.RequiresApi
+import android.util.Base64
 import androidx.preference.EditTextPreference
 import androidx.preference.ListPreference
 import androidx.preference.PreferenceScreen
@@ -33,17 +31,16 @@ import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
 import java.net.URLEncoder
 import java.text.SimpleDateFormat
-import java.util.Base64
 import java.util.Date
 import java.util.Locale
 import kotlin.math.floor
 
-@SuppressLint("NewApi")
 class Picacomic : HttpSource(), ConfigurableSource {
     override val lang = "zh"
     override val supportsLatest = true
     override val name = "哔咔漫画"
     override val baseUrl = "https://picaapi.picacomic.com"
+    private val leeway: Long = 10
 
     private val preferences: SharedPreferences =
         Injekt.get<Application>().getSharedPreferences("source_$id", 0x0000)
@@ -74,7 +71,7 @@ class Picacomic : HttpSource(), ConfigurableSource {
 
     private val token: String by lazy {
         var t: String = preferences.getString("TOKEN", "")!!
-        if (t.isEmpty() || isExpired(t, 10)) {
+        if (t.isEmpty() || isExpired(t)) {
             val username = preferences.getString("USERNAME", "")!!
             val password = preferences.getString("PASSWORD", "")!!
             if (username.isEmpty() || password.isEmpty()) {
@@ -87,10 +84,7 @@ class Picacomic : HttpSource(), ConfigurableSource {
         t
     }
 
-    @RequiresApi(Build.VERSION_CODES.O)
-    fun isExpired(token: String, leeway: Long): Boolean {
-        require(leeway >= 0) { "The leeway must be a positive value." }
-
+    private fun isExpired(token: String): Boolean {
         var parts: Array<String?> =
             token.split("\\.".toRegex()).dropLastWhile { it.isEmpty() }.toTypedArray()
 
@@ -100,13 +94,13 @@ class Picacomic : HttpSource(), ConfigurableSource {
         if (parts.size != 3) {
             throw Exception(
                 String.format(
-                    "token shoud have 3 parts, but now there's %s.",
+                    "token should have 3 parts, but now there's %s.",
                     parts.size,
                 ),
             )
         }
 
-        val payload = parts[1]?.let { JSONObject(String(Base64.getDecoder().decode(it))) }
+        val payload = parts[1]?.let { JSONObject(String(Base64.decode(it, Base64.DEFAULT))) }
 
         val exp = payload?.getLong("exp")?.let {
             Date(it * 1000)
@@ -115,8 +109,7 @@ class Picacomic : HttpSource(), ConfigurableSource {
             Date(it * 1000)
         }
 
-        val todayTime =
-            (floor((Date().time / 1000).toDouble()) * 1000).toLong() // truncate millis
+        val todayTime = (floor((Date().time / 1000).toDouble()) * 1000).toLong() // truncate millis
         val futureToday = Date(todayTime + leeway * 1000)
         val pastToday = Date(todayTime - leeway * 1000)
         val expValid = exp == null || !pastToday.after(exp)
